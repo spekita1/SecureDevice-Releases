@@ -1,13 +1,13 @@
 {
   "appId": "com.spekita.securedevice",
   "channel": "stable",
-  "versionCode": 1,
-  "versionName": "1.0.1",
-  "apkUrl": "https://github.com/spekita1/SecureDevice-Releases/releases/download/v1.0.1/app-release.apk",
+  "versionCode": 2,
+  "versionName": "1.1.0",
+  "apkUrl": "https://github.com/spekita1/SecureDevice-Releases/releases/download/v1.1.0/app-release.apk",
   "sha256": "37b4170a51e2dd7c29d4549582ceaa2055fdff098020b5215d829c66958ec648",
   "minSupportedVersionCode": 1,
   "forceUpdate": false,
   "rolloutPercent": 100,
   "releasedAt": "2026-05-19T00:00:00Z",
-  "notes": "SecureDevice v1.0.1 production sync build"
+  "notes": "SecureDevice v1.1.0 production sync build"
 }

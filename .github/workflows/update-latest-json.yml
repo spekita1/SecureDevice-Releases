@@ -1,6 +1,12 @@
 name: Update latest json checksum
 
 on:
+  release:
+    types:
+      - published
+      - edited
+      - prereleased
+      - released
   workflow_dispatch:
 
 permissions:
@@ -16,7 +22,10 @@ jobs:
       - name: Download APK and update json
         run: |
           set -e
-          TAG_NAME="v1.0.1"
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          if [ -z "$TAG_NAME" ]; then
+            TAG_NAME="v1.0.1"
+          fi
           APK_NAME="app-release.apk"
           APK_URL="https://github.com/spekita1/SecureDevice-Releases/releases/download/${TAG_NAME}/${APK_NAME}"
 
@@ -25,7 +34,7 @@ jobs:
           SHA256=$(sha256sum "$APK_NAME" | awk '{print $1}')
           QR_CHECKSUM=$(xxd -r -p <<< "$SHA256" | openssl base64 -A | tr '+/' '-_' | tr -d '=')
 
-          jq --arg apkUrl "$APK_URL" --arg sha "$SHA256" --arg checksum "$QR_CHECKSUM" '.apkUrl=$apkUrl | .sha256=$sha | .provisioningChecksumBase64=$checksum' latest.json > latest.tmp.json
+          jq --arg apkUrl "$APK_URL" --arg sha "$SHA256" --arg checksum "$QR_CHECKSUM" '.versionName=($apkUrl | split("/releases/download/")[1] | split("/")[0] | ltrimstr("v")) | .apkUrl=$apkUrl | .sha256=$sha | .provisioningChecksumBase64=$checksum' latest.json > latest.tmp.json
           mv latest.tmp.json latest.json
 
       - name: Commit changes

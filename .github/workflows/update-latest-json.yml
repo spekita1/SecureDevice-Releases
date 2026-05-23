@@ -1,0 +1,38 @@
+name: Update latest json checksum
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Download APK and update json
+        run: |
+          set -e
+          TAG_NAME="v1.0.1"
+          APK_NAME="app-release.apk"
+          APK_URL="https://github.com/spekita1/SecureDevice-Releases/releases/download/${TAG_NAME}/${APK_NAME}"
+
+          curl -L "$APK_URL" -o "$APK_NAME"
+
+          SHA256=$(sha256sum "$APK_NAME" | awk '{print $1}')
+          QR_CHECKSUM=$(xxd -r -p <<< "$SHA256" | openssl base64 -A | tr '+/' '-_' | tr -d '=')
+
+          jq --arg apkUrl "$APK_URL" --arg sha "$SHA256" --arg checksum "$QR_CHECKSUM" '.apkUrl=$apkUrl | .sha256=$sha | .provisioningChecksumBase64=$checksum' latest.json > latest.tmp.json
+          mv latest.tmp.json latest.json
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add latest.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Auto update latest json checksum"
+          git push

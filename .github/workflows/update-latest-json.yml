@@ -70,12 +70,16 @@ jobs:
           echo "RELEASED_AT=$RELEASED_AT" >> "$GITHUB_ENV"
 
       - name: Publish latest metadata to Supabase
-        if: ${{ secrets.SUPABASE_URL != '' && secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "Supabase secrets are missing; skipping Supabase metadata publish."
+            exit 0
+          fi
+
           BASE_URL="${SUPABASE_URL%/}"
           TABLE_URL="$BASE_URL/rest/v1/secure_app_releases"
           AUTH_HEADER="Authori""zation: Bear""er ${SUPABASE_SERVICE_ROLE_KEY}"

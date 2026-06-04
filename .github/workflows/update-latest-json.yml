@@ -82,18 +82,42 @@ jobs:
 
           BASE_URL="${SUPABASE_URL%/}"
           TABLE_URL="$BASE_URL/rest/v1/secure_app_releases"
-          AUTH_ARGS=()
+          AUTH_ARGS=(-H "api""key: ${SUPABASE_SERVICE_ROLE_KEY}")
           if [[ "$SUPABASE_SERVICE_ROLE_KEY" == eyJ* ]]; then
-            AUTH_ARGS=(-H "Authori""zation: Bear""er ${SUPABASE_SERVICE_ROLE_KEY}")
+            AUTH_ARGS+=( -H "Authori""zation: Bear""er ${SUPABASE_SERVICE_ROLE_KEY}" )
           fi
 
-          curl -fL -X PATCH \
+          call_supabase() {
+            local method="$1"
+            local url="$2"
+            local payload_arg="${3:-}"
+            local body_file="supabase-response.json"
+            local status
+            if [ -n "$payload_arg" ]; then
+              status=$(curl -sS -L -o "$body_file" -w "%{http_code}" -X "$method" "$url" \
+                "${AUTH_ARGS[@]}" \
+                -H "Content-Type: application/json" \
+                -H "Prefer: return=minimal" \
+                --data "$payload_arg")
+            else
+              status=$(curl -sS -L -o "$body_file" -w "%{http_code}" -X "$method" "$url" \
+                "${AUTH_ARGS[@]}" \
+                -H "Content-Type: application/json" \
+                -H "Prefer: return=minimal")
+            fi
+            if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+              echo "Supabase request failed. Method=$method HTTP=$status"
+              cat "$body_file" || true
+              exit 1
+            fi
+          }
+
+          call_supabase PATCH \
             "$TABLE_URL?app_id=eq.com.spekita.spekitasecure&channel=eq.stable&is_latest=eq.true" \
-            -H "api""key: ${SUPABASE_SERVICE_ROLE_KEY}" \
-            "${AUTH_ARGS[@]}" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=minimal" \
-            --data '{"is_latest":false}'
+            '{"is_latest":false}'
+
+          call_supabase DELETE \
+            "$TABLE_URL?app_id=eq.com.spekita.spekitasecure&channel=eq.stable&tag=eq.${TAG_NAME}"
 
           jq -n \
             --arg app_id "com.spekita.spekitasecure" \
@@ -113,13 +137,7 @@ jobs:
             '{app_id:$app_id, channel:$channel, tag:$tag, version_name:$version_name, release_repo:$release_repo, apk_name:$apk_name, apk_url:$apk_url, sha256:$sha256, provisioning_checksum_base64:$provisioning_checksum_base64, signature_checksum_base64:$signature_checksum_base64, component_name:$component_name, package_name:$package_name, certificate_sha256_hex:$certificate_sha256_hex, is_latest:true, is_active:true, released_at:$released_at}' \
             > supabase-release-row.json
 
-          curl -fL -X POST \
-            "$TABLE_URL?on_conflict=app_id,channel,tag" \
-            -H "api""key: ${SUPABASE_SERVICE_ROLE_KEY}" \
-            "${AUTH_ARGS[@]}" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: resolution=merge-duplicates,return=minimal" \
-            --data @supabase-release-row.json
+          call_supabase POST "$TABLE_URL" "@supabase-release-row.json"
 
       - name: Commit changes
         run: |

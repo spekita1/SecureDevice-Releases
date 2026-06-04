@@ -82,12 +82,15 @@ jobs:
 
           BASE_URL="${SUPABASE_URL%/}"
           TABLE_URL="$BASE_URL/rest/v1/secure_app_releases"
-          AUTH_HEADER="Authori""zation: Bear""er ${SUPABASE_SERVICE_ROLE_KEY}"
+          AUTH_ARGS=()
+          if [[ "$SUPABASE_SERVICE_ROLE_KEY" == eyJ* ]]; then
+            AUTH_ARGS=(-H "Authori""zation: Bear""er ${SUPABASE_SERVICE_ROLE_KEY}")
+          fi
 
           curl -fL -X PATCH \
             "$TABLE_URL?app_id=eq.com.spekita.spekitasecure&channel=eq.stable&is_latest=eq.true" \
             -H "api""key: ${SUPABASE_SERVICE_ROLE_KEY}" \
-            -H "$AUTH_HEADER" \
+            "${AUTH_ARGS[@]}" \
             -H "Content-Type: application/json" \
             -H "Prefer: return=minimal" \
             --data '{"is_latest":false}'
@@ -113,7 +116,7 @@ jobs:
           curl -fL -X POST \
             "$TABLE_URL?on_conflict=app_id,channel,tag" \
             -H "api""key: ${SUPABASE_SERVICE_ROLE_KEY}" \
-            -H "$AUTH_HEADER" \
+            "${AUTH_ARGS[@]}" \
             -H "Content-Type: application/json" \
             -H "Prefer: resolution=merge-duplicates,return=minimal" \
             --data @supabase-release-row.json

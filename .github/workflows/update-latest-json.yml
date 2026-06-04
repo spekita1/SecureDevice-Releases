@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Download APK and update json
         env:
@@ -125,4 +127,4 @@ jobs:
           git add latest.json
           git diff --cached --quiet && exit 0
           git commit -m "Auto update latest json checksum"
-          git push
+          git push origin HEAD:main

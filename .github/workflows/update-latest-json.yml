@@ -81,63 +81,41 @@ jobs:
           fi
 
           BASE_URL="${SUPABASE_URL%/}"
-          TABLE_URL="$BASE_URL/rest/v1/secure_app_releases"
+          RPC_URL="$BASE_URL/rest/v1/rpc/upsert_secure_app_release"
           AUTH_ARGS=(-H "api""key: ${SUPABASE_SERVICE_ROLE_KEY}")
           if [[ "$SUPABASE_SERVICE_ROLE_KEY" == eyJ* ]]; then
             AUTH_ARGS+=( -H "Authori""zation: Bear""er ${SUPABASE_SERVICE_ROLE_KEY}" )
           fi
 
-          call_supabase() {
-            local method="$1"
-            local url="$2"
-            local payload_arg="${3:-}"
-            local body_file="supabase-response.json"
-            local status
-            if [ -n "$payload_arg" ]; then
-              status=$(curl -sS -L -o "$body_file" -w "%{http_code}" -X "$method" "$url" \
-                "${AUTH_ARGS[@]}" \
-                -H "Content-Type: application/json" \
-                -H "Prefer: return=minimal" \
-                --data "$payload_arg")
-            else
-              status=$(curl -sS -L -o "$body_file" -w "%{http_code}" -X "$method" "$url" \
-                "${AUTH_ARGS[@]}" \
-                -H "Content-Type: application/json" \
-                -H "Prefer: return=minimal")
-            fi
-            if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
-              echo "Supabase request failed. Method=$method HTTP=$status"
-              cat "$body_file" || true
-              exit 1
-            fi
-          }
-
-          call_supabase PATCH \
-            "$TABLE_URL?app_id=eq.com.spekita.spekitasecure&channel=eq.stable&is_latest=eq.true" \
-            '{"is_latest":false}'
-
-          call_supabase DELETE \
-            "$TABLE_URL?app_id=eq.com.spekita.spekitasecure&channel=eq.stable&tag=eq.${TAG_NAME}"
-
           jq -n \
-            --arg app_id "com.spekita.spekitasecure" \
-            --arg channel "stable" \
-            --arg tag "$TAG_NAME" \
-            --arg version_name "$VERSION_NAME" \
-            --arg release_repo "spekita1/SecureDevice-Releases" \
-            --arg apk_name "$APK_NAME" \
-            --arg apk_url "$APK_URL" \
-            --arg sha256 "$SHA256" \
-            --arg provisioning_checksum_base64 "$QR_CHECKSUM" \
-            --arg signature_checksum_base64 "$SIGNATURE_CHECKSUM" \
-            --arg component_name "$COMPONENT_NAME" \
-            --arg package_name "$PACKAGE_NAME" \
-            --arg certificate_sha256_hex "$CERT_SHA256" \
-            --arg released_at "$RELEASED_AT" \
-            '{app_id:$app_id, channel:$channel, tag:$tag, version_name:$version_name, release_repo:$release_repo, apk_name:$apk_name, apk_url:$apk_url, sha256:$sha256, provisioning_checksum_base64:$provisioning_checksum_base64, signature_checksum_base64:$signature_checksum_base64, component_name:$component_name, package_name:$package_name, certificate_sha256_hex:$certificate_sha256_hex, is_latest:true, is_active:true, released_at:$released_at}' \
-            > supabase-release-row.json
+            --arg p_app_id "com.spekita.spekitasecure" \
+            --arg p_channel "stable" \
+            --arg p_tag "$TAG_NAME" \
+            --arg p_version_name "$VERSION_NAME" \
+            --arg p_release_repo "spekita1/SecureDevice-Releases" \
+            --arg p_apk_name "$APK_NAME" \
+            --arg p_apk_url "$APK_URL" \
+            --arg p_sha256 "$SHA256" \
+            --arg p_provisioning_checksum_base64 "$QR_CHECKSUM" \
+            --arg p_signature_checksum_base64 "$SIGNATURE_CHECKSUM" \
+            --arg p_component_name "$COMPONENT_NAME" \
+            --arg p_package_name "$PACKAGE_NAME" \
+            --arg p_certificate_sha256_hex "$CERT_SHA256" \
+            --arg p_released_at "$RELEASED_AT" \
+            '{p_app_id:$p_app_id, p_channel:$p_channel, p_tag:$p_tag, p_version_name:$p_version_name, p_release_repo:$p_release_repo, p_apk_name:$p_apk_name, p_apk_url:$p_apk_url, p_sha256:$p_sha256, p_provisioning_checksum_base64:$p_provisioning_checksum_base64, p_signature_checksum_base64:$p_signature_checksum_base64, p_component_name:$p_component_name, p_package_name:$p_package_name, p_certificate_sha256_hex:$p_certificate_sha256_hex, p_released_at:$p_released_at}' \
+            > supabase-rpc-payload.json
 
-          call_supabase POST "$TABLE_URL" "@supabase-release-row.json"
+          status=$(curl -sS -L -o supabase-response.json -w "%{http_code}" -X POST "$RPC_URL" \
+            "${AUTH_ARGS[@]}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            --data @supabase-rpc-payload.json)
+
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "Supabase RPC failed. HTTP=$status"
+            cat supabase-response.json || true
+            exit 1
+          fi
 
       - name: Commit changes
         run: |

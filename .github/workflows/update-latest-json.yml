@@ -31,13 +31,23 @@ jobs:
           fi
 
           APK_NAME="app-release.apk"
+          METADATA_NAME="provisioning-metadata.json"
           APK_URL="https://github.com/spekita1/SecureDevice-Releases/releases/download/${TAG_NAME}/${APK_NAME}"
+          METADATA_URL="https://github.com/spekita1/SecureDevice-Releases/releases/download/${TAG_NAME}/${METADATA_NAME}"
 
           curl -fL "$APK_URL" -o "$APK_NAME"
           test -s "$APK_NAME"
+          curl -fL "$METADATA_URL" -o "$METADATA_NAME"
+          test -s "$METADATA_NAME"
 
           SHA256=$(sha256sum "$APK_NAME" | awk '{print $1}')
           QR_CHECKSUM=$(printf "%s" "$SHA256" | xxd -r -p | openssl base64 -A | tr '+/' '-_' | tr -d '=')
+          SIGNATURE_CHECKSUM=$(jq -r '.signature_checksum_b64 // ""' "$METADATA_NAME")
+          COMPONENT_NAME=$(jq -r '.component_name // "com.spekita.spekitasecure/.MyDeviceAdminReceiver"' "$METADATA_NAME")
+          PACKAGE_NAME=$(jq -r '.package_name // "com.spekita.spekitasecure"' "$METADATA_NAME")
+          CERT_SHA256=$(jq -r '.certificate_sha256_hex // ""' "$METADATA_NAME")
+          VERSION_NAME="${TAG_NAME#v}"
+          RELEASED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
           jq \
             --arg apkUrl "$APK_URL" \
@@ -46,6 +56,63 @@ jobs:
             '.versionName=($apkUrl | split("/releases/download/")[1] | split("/")[0] | ltrimstr("v")) | .apkUrl=$apkUrl | .sha256=$sha | .provisioningChecksumBase64=$checksum' \
             latest.json > latest.tmp.json
           mv latest.tmp.json latest.json
+
+          echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "APK_NAME=$APK_NAME" >> "$GITHUB_ENV"
+          echo "APK_URL=$APK_URL" >> "$GITHUB_ENV"
+          echo "SHA256=$SHA256" >> "$GITHUB_ENV"
+          echo "QR_CHECKSUM=$QR_CHECKSUM" >> "$GITHUB_ENV"
+          echo "SIGNATURE_CHECKSUM=$SIGNATURE_CHECKSUM" >> "$GITHUB_ENV"
+          echo "COMPONENT_NAME=$COMPONENT_NAME" >> "$GITHUB_ENV"
+          echo "PACKAGE_NAME=$PACKAGE_NAME" >> "$GITHUB_ENV"
+          echo "CERT_SHA256=$CERT_SHA256" >> "$GITHUB_ENV"
+          echo "RELEASED_AT=$RELEASED_AT" >> "$GITHUB_ENV"
+
+      - name: Publish latest metadata to Supabase
+        if: ${{ secrets.SUPABASE_URL != '' && secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          BASE_URL="${SUPABASE_URL%/}"
+          TABLE_URL="$BASE_URL/rest/v1/secure_app_releases"
+          AUTH_HEADER="Authori""zation: Bear""er ${SUPABASE_SERVICE_ROLE_KEY}"
+
+          curl -fL -X PATCH \
+            "$TABLE_URL?app_id=eq.com.spekita.spekitasecure&channel=eq.stable&is_latest=eq.true" \
+            -H "api""key: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            --data '{"is_latest":false}'
+
+          jq -n \
+            --arg app_id "com.spekita.spekitasecure" \
+            --arg channel "stable" \
+            --arg tag "$TAG_NAME" \
+            --arg version_name "$VERSION_NAME" \
+            --arg release_repo "spekita1/SecureDevice-Releases" \
+            --arg apk_name "$APK_NAME" \
+            --arg apk_url "$APK_URL" \
+            --arg sha256 "$SHA256" \
+            --arg provisioning_checksum_base64 "$QR_CHECKSUM" \
+            --arg signature_checksum_base64 "$SIGNATURE_CHECKSUM" \
+            --arg component_name "$COMPONENT_NAME" \
+            --arg package_name "$PACKAGE_NAME" \
+            --arg certificate_sha256_hex "$CERT_SHA256" \
+            --arg released_at "$RELEASED_AT" \
+            '{app_id:$app_id, channel:$channel, tag:$tag, version_name:$version_name, release_repo:$release_repo, apk_name:$apk_name, apk_url:$apk_url, sha256:$sha256, provisioning_checksum_base64:$provisioning_checksum_base64, signature_checksum_base64:$signature_checksum_base64, component_name:$component_name, package_name:$package_name, certificate_sha256_hex:$certificate_sha256_hex, is_latest:true, is_active:true, released_at:$released_at}' \
+            > supabase-release-row.json
+
+          curl -fL -X POST \
+            "$TABLE_URL?on_conflict=app_id,channel,tag" \
+            -H "api""key: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates,return=minimal" \
+            --data @supabase-release-row.json
 
       - name: Commit changes
         run: |

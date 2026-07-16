@@ -1,11 +1,11 @@
 name: Update latest json checksum
 
 on:
+  # Run once after the release and its assets are fully available.
+  # The previous published+released triggers raced each other: published
+  # could run before provisioning-metadata.json finished uploading.
   release:
     types:
-      - published
-      - edited
-      - prereleased
       - released
   workflow_dispatch:
 

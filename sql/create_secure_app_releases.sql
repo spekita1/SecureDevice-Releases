@@ -4,7 +4,7 @@ create table if not exists public.secure_app_releases (
   channel text not null default 'stable',
   tag text not null,
   version_name text not null,
-  release_repo text not null default 'spekita1/SecureDevice-Releases',
+  release_repo text not null default 'spekita-general-traders/SecureDevice-Releases',
   apk_name text not null default 'app-release.apk',
   apk_url text not null,
   sha256 text not null,

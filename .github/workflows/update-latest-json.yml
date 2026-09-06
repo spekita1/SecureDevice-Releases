@@ -29,13 +29,13 @@ jobs:
 
           TAG_NAME="${{ github.event.release.tag_name }}"
           if [ -z "$TAG_NAME" ]; then
-            TAG_NAME=$(gh release view --repo spekita1/SecureDevice-Releases --json tagName --jq .tagName)
+            TAG_NAME=$(gh release view --repo spekita-general-traders/SecureDevice-Releases --json tagName --jq .tagName)
           fi
 
           APK_NAME="app-release.apk"
           METADATA_NAME="provisioning-metadata.json"
-          APK_URL="https://github.com/spekita1/SecureDevice-Releases/releases/download/${TAG_NAME}/${APK_NAME}"
-          METADATA_URL="https://github.com/spekita1/SecureDevice-Releases/releases/download/${TAG_NAME}/${METADATA_NAME}"
+          APK_URL="https://github.com/spekita-general-traders/SecureDevice-Releases/releases/download/${TAG_NAME}/${APK_NAME}"
+          METADATA_URL="https://github.com/spekita-general-traders/SecureDevice-Releases/releases/download/${TAG_NAME}/${METADATA_NAME}"
 
           curl -fL "$APK_URL" -o "$APK_NAME"
           test -s "$APK_NAME"
@@ -94,7 +94,7 @@ jobs:
             --arg p_channel "stable" \
             --arg p_tag "$TAG_NAME" \
             --arg p_version_name "$VERSION_NAME" \
-            --arg p_release_repo "spekita1/SecureDevice-Releases" \
+            --arg p_release_repo "spekita-general-traders/SecureDevice-Releases" \
             --arg p_apk_name "$APK_NAME" \
             --arg p_apk_url "$APK_URL" \
             --arg p_sha256 "$SHA256" \
